@@ -1,0 +1,163 @@
+﻿@page "/weather"
+@using DontUseaGenericRepository.Models
+@using DontUseaGenericRepository.Services
+@inject WeatherService WeatherService
+
+<PageTitle>Weather</PageTitle>
+
+<h1>Weather</h1>
+
+<p>This component demonstrates CRUD operations using Entity Framework Core <strong>without</strong> a generic repository pattern.</p>
+
+@if (forecasts == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="mb-3">
+        <button class="btn btn-primary" @onclick="ShowAddForm">
+            <span class="oi oi-plus"></span> Add New Forecast
+        </button>
+    </div>
+
+    @if (showForm)
+    {
+        <div class="card mb-3">
+            <div class="card-header">
+                @(isEditing ? "Edit Forecast" : "Add New Forecast")
+            </div>
+            <div class="card-body">
+                <EditForm Model="editingForecast" OnValidSubmit="SaveForecast">
+                    <DataAnnotationsValidator />
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Date</label>
+                            <InputDate @bind-Value="editingForecast.Date" class="form-control" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Temperature (°C)</label>
+                            <InputNumber @bind-Value="editingForecast.TemperatureC" class="form-control" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Summary</label>
+                            <InputSelect @bind-Value="editingForecast.Summary" class="form-control">
+                                <option value="">-- Select --</option>
+                                @foreach (var summary in summaryOptions)
+                                {
+                                    <option value="@summary">@summary</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end gap-2">
+                            <button type="submit" class="btn btn-success">Save</button>
+                            <button type="button" class="btn btn-secondary" @onclick="CancelEdit">Cancel</button>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Date</th>
+                <th aria-label="Temperature in Celsius">Temp. (C)</th>
+                <th aria-label="Temperature in Fahrenheit">Temp. (F)</th>
+                <th>Summary</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var forecast in forecasts)
+            {
+                <tr>
+                    <td>@forecast.Id</td>
+                    <td>@forecast.Date.ToShortDateString()</td>
+                    <td>@forecast.TemperatureC</td>
+                    <td>@forecast.TemperatureF</td>
+                    <td>@forecast.Summary</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => EditForecast(forecast)">
+                            Edit
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteForecast(forecast.Id)">
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<WeatherForecast>? forecasts;
+    private WeatherForecast editingForecast = new();
+    private bool showForm;
+    private bool isEditing;
+    private string[] summaryOptions = WeatherService.GetSummaryOptions();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadForecasts();
+    }
+
+    private async Task LoadForecasts()
+    {
+        forecasts = await WeatherService.GetAllAsync();
+    }
+
+    private void ShowAddForm()
+    {
+        editingForecast = new WeatherForecast
+        {
+            Date = DateOnly.FromDateTime(DateTime.Now)
+        };
+        isEditing = false;
+        showForm = true;
+    }
+
+    private void EditForecast(WeatherForecast forecast)
+    {
+        // Create a copy to edit
+        editingForecast = new WeatherForecast
+        {
+            Id = forecast.Id,
+            Date = forecast.Date,
+            TemperatureC = forecast.TemperatureC,
+            Summary = forecast.Summary
+        };
+        isEditing = true;
+        showForm = true;
+    }
+
+    private async Task SaveForecast()
+    {
+        if (isEditing)
+        {
+            await WeatherService.UpdateAsync(editingForecast);
+        }
+        else
+        {
+            await WeatherService.CreateAsync(editingForecast);
+        }
+
+        showForm = false;
+        await LoadForecasts();
+    }
+
+    private void CancelEdit()
+    {
+        showForm = false;
+        editingForecast = new();
+    }
+
+    private async Task DeleteForecast(int id)
+    {
+        await WeatherService.DeleteAsync(id);
+        await LoadForecasts();
+    }
+}
